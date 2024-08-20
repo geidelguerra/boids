@@ -133,6 +133,8 @@ void UpdateFlock(Flock *flock) {
                 seek = Vector2Normalize(seek);
                 seek = Vector2Scale(seek, flock->maxSeekForce);
             }
+        } else {
+            // Wander
         }
 
         entity->acceleration.x += align.x;

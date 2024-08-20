@@ -1,5 +1,7 @@
 # Boids - Steering behaviours simulation in C with Raylib
 
+![image](screenshot.png)
+
 ## References
 - https://github.com/raysan5/raylib
 - https://processing.org/examples/flocking.html
