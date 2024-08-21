@@ -14,6 +14,7 @@ typedef struct Entity {
     Vector2 velocity;
     Vector2 acceleration;
     Vector2 direction;
+    Vector2 projectionForward;
     EntityState state;
     float radius;
 } Entity;
@@ -49,6 +50,11 @@ void InitFlock(Flock *flock, Vector2 center, EntityState state) {
 }
 
 void UpdateFlock(Flock *flock) {
+    if (IsKeyPressed(KEY_R)) {
+        Vector2 startPoint = { GetScreenWidth() / 2, GetScreenHeight() / 2 };
+        InitFlock(flock, startPoint, ENTITY_STATE_ACTIVE);
+    }
+
     if (IsKeyPressed(KEY_H)) {
         flock->renderHelpers = flock->renderHelpers ? 0 : 1;
     }
@@ -65,6 +71,7 @@ void UpdateFlock(Flock *flock) {
     Vector2 separation = {0, 0};
     Vector2 seek = {0, 0};
     Vector2 wander = {0, 0};
+    Vector2 screenCenter = { GetScreenWidth() /2, GetScreenHeight() / 2 };
 
     for (int i = 0; i < MAX_NUM_ENTITIES; i++) {
         Entity *entity = &flock->entities[i];
@@ -163,6 +170,7 @@ void UpdateFlock(Flock *flock) {
         entity->velocity.x += entity->acceleration.x;
         entity->velocity.y += entity->acceleration.y;
         entity->direction = Vector2Normalize(entity->velocity);
+        entity->projectionForward = Vector2Add(entity->position, Vector2Scale(entity->direction, flock->awarenessRadius));
         entity->position.x += entity->velocity.x * GetFrameTime();
         entity->position.y += entity->velocity.y * GetFrameTime();
         entity->acceleration.x = 0;
@@ -170,62 +178,66 @@ void UpdateFlock(Flock *flock) {
     }
 }
 
+void DrawFlock(Flock flock) {
+    for (int i = 0; i < MAX_NUM_ENTITIES; i++) {
+        Entity entity = flock.entities[i];
+
+        if (entity.state == ENTITY_STATE_INACTIVE) continue;
+
+        DrawCircleV(entity.position, entity.radius, YELLOW);
+        DrawCircleLinesV(entity.position, entity.radius, RED);
+
+        if (flock.renderHelpers) {
+            DrawCircleLinesV(entity.position, flock.awarenessRadius, (Color){ 255, 255, 255, 30});
+
+            DrawCircleLinesV(entity.position, flock.separationRadius, (Color){ 255, 0, 0, 30});
+
+            Vector2 forwardTarget = flock.shouldSeekTarget ? flock.seekTarget : entity.projectionForward;
+            DrawLineV(entity.position, forwardTarget, (Color){ 255, 255, 255, 30});
+            DrawCircleV(forwardTarget, 2, (Color){ 253, 249, 0, 40 });
+        }
+    }
+
+    if (flock.shouldSeekTarget) {
+        DrawCircleV(flock.seekTarget, 5, (Color){ 255, 255, 255, 10});
+    }
+}
+
+void DrawUI(Flock flock) {
+    char text[100];
+    sprintf(text, "FPS %d Entities %d Speed %0.1f Align %0.2f Cohesion %0.2f Separation %0.2f Seek %0.2f", GetFPS(), MAX_NUM_ENTITIES, flock.maxSpeed, flock.maxAlignForce, flock.maxCohesionForce, flock.maxSeparationForce, flock.maxSeekForce);
+    DrawText(text, 10, 10, 20, WHITE);
+
+    DrawText("R to Reload. H to toggle debug mode. Left Mouse pressed to seek pointer", 10, GetScreenHeight() - 22, 20, GRAY);
+}
+
 int main() {
-    Flock flock;
-    flock.seekTarget.x = 0;
-    flock.seekTarget.y = 0;
-    flock.shouldSeekTarget = 0;
-    flock.renderHelpers = 0;
-    flock.maxSpeed = 350;
-    flock.maxAlignForce = 0.1;
-    flock.maxCohesionForce = 0.1;
-    flock.maxSeparationForce = 1;
-    flock.maxSeekForce = 4;
-    flock.awarenessRadius = 50;
-    flock.separationRadius = 15;
+    Flock flock = {
+        .seekTarget = {0, 0},
+        .shouldSeekTarget = 0,
+        .renderHelpers = 0,
+        .maxSpeed = 150,
+        .maxAlignForce = 0.1,
+        .maxCohesionForce = 0.1,
+        .maxSeparationForce = 1,
+        .maxSeekForce = 4,
+        .awarenessRadius = 50,
+        .separationRadius = 15
+    };
 
     InitWindow(1024, 1024, "Boids");
     SetTargetFPS(144);
 
-    Vector2 screenCenter = { GetScreenWidth() / 2, GetScreenHeight() / 2 };
-    InitFlock(&flock, screenCenter, ENTITY_STATE_ACTIVE);
+    Vector2 startPoint = { GetScreenWidth() / 2, GetScreenHeight() / 2 };
+    InitFlock(&flock, startPoint, ENTITY_STATE_ACTIVE);
 
     while(!WindowShouldClose()) {
-        if (IsKeyPressed(KEY_R)) {
-            InitFlock(&flock, screenCenter, ENTITY_STATE_ACTIVE);
-        }
-
         UpdateFlock(&flock);
 
         BeginDrawing();
         ClearBackground(BLACK);
-
-        for (int i = 0; i < MAX_NUM_ENTITIES; i++) {
-            Entity entity = flock.entities[i];
-
-            if (entity.state == ENTITY_STATE_INACTIVE) continue;
-
-            DrawCircleV(entity.position, entity.radius, YELLOW);
-            DrawCircleLinesV(entity.position, entity.radius, RED);
-
-            if (flock.renderHelpers) {
-                DrawCircleLinesV(entity.position, flock.awarenessRadius, (Color){ 255, 255, 255, 50});
-
-                DrawCircleLinesV(entity.position, flock.separationRadius, (Color){ 255, 0, 0, 100});
-
-                Vector2 targetPos = flock.shouldSeekTarget ? flock.seekTarget : Vector2Add(entity.position, Vector2Scale(entity.direction, flock.awarenessRadius));
-                DrawLineV(entity.position, targetPos, (Color){ 255, 255, 255, 50});
-            }
-        }
-
-        if (flock.shouldSeekTarget) {
-            DrawCircleV(flock.seekTarget, 5, WHITE);
-        }
-
-        char text[100];
-        sprintf(text, "FPS %d Entities %d Speed %0.1f Align %0.2f Cohesion %0.2f Separation %0.2f Seek %0.2f", GetFPS(), MAX_NUM_ENTITIES, flock.maxSpeed, flock.maxAlignForce, flock.maxCohesionForce, flock.maxSeparationForce, flock.maxSeekForce);
-        DrawText(text, 10, 10, 18, WHITE);
-
+        DrawFlock(flock);
+        DrawUI(flock);
         EndDrawing();
     }
 
